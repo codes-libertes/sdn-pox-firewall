@@ -2,6 +2,9 @@ import os
 import sys
 from pox.core import core
 from netaddr import IPNetwork, IPAddress
+import pox.openflow.libopenflow_01 as of
+import pox.lib.packet as pkt
+from pox.lib.addresses import IPAddr
 
 log = core.getLogger()
 	
@@ -15,6 +18,82 @@ class Firewall(object):
 		self.flow_table = {}
 		self.inside_network = ["10.0.0.0/24"]
 		connection.addListeners(self)
+		self.config_ARP_flow()
+		self.config_ICMP_flow()
+		self.config_TCP_flow()
+
+	def config_ARP_flow(self):
+		self.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
+		self.config_protocol_flow(pkt.arp.REPLY,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
+		
+	def config_ICMP_flow(self):
+		self.config_protocol_flow(pkt.ipv4.ICMP_PROTOCOL,pkt.ethernet.IP_TYPE,None,None,None,None,False)
+
+	def config_TCP_flow(self):
+		global config
+		for rule in config:
+			rule[srcip] = clean_ip(rule[srcip])	
+			rule[dstip] = clean_ip(rule[dstip])	
+			if rule[srcip] != 'any':
+				nw_src = rule[srcip]
+			else:	
+				nw_src = None
+			if rule[dstip] != 'any':
+				nw_dst = rule[dstip]
+			else:	
+				nw_dst = None
+			if rule[srcport] != 'any':
+				tp_src = int(rule[srcport])
+			else:	
+				tp_src = None
+			if rule[dstport] != 'any':
+				tp_dst = int(rule[dstport])
+			else:	
+				tp_dst = None
+			self.config_protocol_flow(pkt.ipv4.TCP_PROTOCOL,pkt.ethernet.IP_TYPE,nw_src,nw_dst,tp_src,tp_dst,True)
+
+	def config_protocol_flow(self,nw_proto,dl_type,nw_src,nw_dst,tp_src,tp_dst,to_controller):
+		"""
+        	Configurations for ARP/ICMP/TCP/UDP packet flows
+        	"""
+		msg = of.ofp_flow_mod()
+		match = of.ofp_match()
+		match.nw_src = None
+		match.nw_dst = None
+		match.tp_src = None
+		match.tp_dst = None
+		match.nw_proto = nw_proto
+		# 0x0800 for IPv4, 0x0806 for ARP
+		match.dl_type = dl_type	
+		msg.match = match
+		msg.hard_timeout = 0
+		msg.soft_timeout = 0
+		msg.priority = 32768
+		# TCP/UDP packets will be sent to Controller that decodes TCP flags
+		if to_controller:
+			action = of.ofp_action_output(port=of.OFPP_CONTROLLER)
+		else:
+			action = of.ofp_action_output(port=of.OFPP_NORMAL)
+
+		msg.actions.append(action)
+		self.connection.send(msg)
+
+	def resend_packet(self,packet):
+		ip_packet = packet.payload
+		tcp_packet = ip_packet.payload
+
+		fields = [str(ip_packet.srcip),str(tcp_packet.srcport),str(ip_packet.dstip),str(tcp_packet.dstport)]
+                print fields
+	
+		self.config_protocol_flow(pkt.ipv4.TCP_PROTOCOL,pkt.ethernet.IP_TYPE,ip_packet.srcip,ip_packet.dstip,tcp_packet.srcport,tcp_packet.dstport,False)
+		self.config_protocol_flow(pkt.ipv4.TCP_PROTOCOL,pkt.ethernet.IP_TYPE,ip_packet.dstip,ip_packet.srcip,tcp_packet.dstport,tcp_packet.srcport,False)
+		
+		msg = of.ofp_packet_out()
+		msg.data = packet
+		action = of.ofp_action_output(port=of.OFPP_NORMAL)
+		msg.actions.append(action)
+		self.connection.send(msg)
+
 
 	def act_like_firewall(self,packet,packet_in):
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
@@ -46,6 +125,8 @@ class Firewall(object):
 					tracker.track_network()
 			elif ip_packet.protocol == ip_packet.ICMP_PROTOCOL:
 				print "ICMP Packet"
+
+			self.resend_packet(packet)
 
 	def _handle_PacketIn(self,event):
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
@@ -199,10 +280,48 @@ class UDPConnTrack(object):
 	def track_network(self): 
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 
-def launch():
+def clean_ip(cidrAddress):
+	strAddress = cidrAddress.split('/',2)
+	if len(strAddress) == 1:
+		return cidrAddress
+	uintAddress = IPAddr(strAddress[0]).toUnsigned()
+	hostMask = 32-int(strAddress[1])
+	hostAddress = uintAddress & ((1<<hostMask) -1 )
+	print "uintAddress:",uintAddress
+	print "hostMask:",hostMask
+	print "hostAddress:",hostAddress
+	if (hostAddress == 0):
+		return cidrAddress
+	else:
+		return strAddress[0]
+
+def parse_config(configuration):
+	print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+	"""
+ 	<srcip> [ / <netmask> ] <srcport> <dstip> [ / <netmask> ] <dstport>
+	"""
+	global config	
+	fin = open(configuration)
+	for line in fin:
+		rule = line.split()
+		print "rule:",rule
+		if (len(rule) > 0):
+			config.append(rule)	
+	
+def launch(configuration=""):
+
 	print "Starting Pox Firewall.."
 	def start_firewall(event):
+		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		Firewall(event.connection)
-	
-	core.openflow.addListenerByName("ConnectionUp",start_firewall)
 
+	parse_config(configuration)
+	core.openflow.addListenerByName("ConnectionUp",start_firewall)
+"""
+Global variables
+"""
+config  = []
+srcip   = 0
+srcport = 1
+dstip   = 2
+dstport = 3
