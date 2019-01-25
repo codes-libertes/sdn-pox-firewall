@@ -2,8 +2,9 @@
 Implementation of stateful firewall using POX controller
 
 # Instructions
+```
 mkdir sdn
-cd sdn/
+cd sdn
 
 git clone git://github.com/mininet/mininet
 sudo mininet/util/install.sh -a
@@ -24,7 +25,7 @@ h2> iperf -s -p 5001 -i 1
 --UDP 
 h1> iperf -c 10.0.0.2 -u -t 100
 h2> iperf -s -u -i 1
-
+```
 
 
 
