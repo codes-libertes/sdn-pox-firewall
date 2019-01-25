@@ -2,6 +2,7 @@
 Implementation of stateful firewall using POX controller
 
 # Instructions
+## Download codes
 ```
 mkdir sdn
 cd sdn
@@ -13,16 +14,37 @@ sudo mn --test pingall
 
 sudo /usr/local/share/openvswitch/scripts/ovs-ctl start
 
-sudo mn --topo single,2 --mac --switch ovsk --controller remote
+git clone https://github.com/codes-libertes/sdn-pox-firewall.git
+
+cp -rfpv sdn-pox-firewall/mn_firewall.py mininet/
+cp -rfpv sdn-pox-firewall/firewall.config pox/
+cp -rfpv sdn-pox-firewall/stateful_firewall_debug.py pox/
+```
+## Open a terminal for Mininet
+```
+cd mininet/
+chmod 555 mn_firewall.py 
+sudo mn -c
+sudo ./mn_firewall.py 
+
 mininet> xterm h1 h2 
 mininet> sh ovs-vsctl show
 mininet> sh ovs-ofctl dump-flows s1
-
---TCP
+mininet> sh ovs-ofctl del-flows s1
+```
+## Open a terminal for Pox
+```
+cd pox/
+chmod 555 stateful_firewall_debug.py 
+./pox.py stateful_firewall_debug --configuration=./firewall.config
+```
+## Test TCP 
+```
 h1> iperf -c 10.0.0.2 -p 5001 -t 100
 h2> iperf -s -p 5001 -i 1
-
---UDP 
+```
+## Test UDP
+```
 h1> iperf -c 10.0.0.2 -u -t 100
 h2> iperf -s -u -i 1
 ```
