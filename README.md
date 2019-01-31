@@ -48,6 +48,13 @@ h2> iperf -s -p 5001 -i 1
 h1> iperf -c 10.0.0.2 -u -t 100
 h2> iperf -s -u -i 1
 ```
+# Astuces
+## How to kill a process
+```
+sudo ps -aux | grep pox
+-----xxx  1.9  0.5 265612 20608 pts/2    Sl+  22:39   0:00 python2.7 -u ./pox.py fw --configuration=./firewall.config
+sudo kill -9 xxx
+```
 
 
 
