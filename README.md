@@ -24,7 +24,7 @@ cp -rfpv sdn-pox-firewall/stateful_firewall_debug.py pox/
 ## Open a terminal for Mininet
 ```
 cd mininet/
-chmod 555 mn_firewall.py 
+chmod 777 mn_firewall.py 
 sudo mn -c
 sudo ./mn_firewall.py 
 
@@ -36,7 +36,7 @@ mininet> sh ovs-ofctl del-flows s1
 ## Open a terminal for Pox
 ```
 cd pox/
-chmod 555 stateful_firewall_debug.py 
+chmod 777 stateful_firewall_debug.py 
 ./pox.py stateful_firewall_debug --configuration=./firewall.config
 ```
 ## Test TCP 
