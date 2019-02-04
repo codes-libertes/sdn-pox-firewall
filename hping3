@@ -1,0 +1,9 @@
+#Purpose
+```
+1. Traceroute/ping hosts behind Firewall which blocks attempts of standard utilities
+2. Perform IdleScan
+3. Test rules of Firewall
+4. Exploit known vulnerabilities of TCP/IP Stacks
+```
+#Usage
+##
