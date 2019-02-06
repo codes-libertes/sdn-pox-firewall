@@ -37,7 +37,7 @@ mininet> sh ovs-ofctl del-flows s1
 ```
 cd pox/
 chmod 777 stateful_firewall_debug.py 
-./pox.py stateful_firewall_debug --configuration=./firewall.config
+./pox.py stateful_firewall_debug --configuration=./firewall.config --config_mac=./firewall.mac.config
 ```
 ## Test TCP 
 ```
