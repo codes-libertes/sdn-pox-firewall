@@ -14,13 +14,19 @@ class Firewall(object):
 
 	def __init__(self,connection):
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
-		self.connection = connection
+  		"""
+		self.connection = variable locale que on a enregistre connection (var externe)sur la var self.connection 
+		"""
+		self.connection = connection 
 		self.flow_table = {}
 		self.inside_network = ["10.0.0.0/24"]
-		connection.addListeners(self)
 		self.config_ARP_flow()
 		self.config_ICMP_flow()
 		self.config_TCP_flow()
+		"""
+		add.Listeners= comme Ecouteur pour Appeler la fonction _handle_PacketIn.
+		"""
+		connection.addListeners(self)		
 
 	def config_ARP_flow(self):
 		self.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
@@ -128,6 +134,9 @@ class Firewall(object):
 
 			self.resend_packet(packet)
 
+	"""
+	la fonction _handle_PacketIn va traiter les donnees de OpenFlow [ARP, ICMP, TCP,UDP, ...]
+	"""
 	def _handle_PacketIn(self,event):
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		packet = event.parsed
@@ -306,9 +315,29 @@ def parse_config(configuration):
 		rule = line.split()
 		print "rule:",rule
 		if (len(rule) > 0):
-			config.append(rule)	
+			config.append(rule)
+
+def parse_configmac(config_mac):
+	print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+	"""
+ 	<srcip> [ / <netmask> ] <srcport> <dstip> [ / <netmask> ] <dstport>
+	"""
+	"""
+	lire le fichier firewall-config-mac
+	"""
 	
-def launch(configuration=""):
+	global configmac	
+	fin = open(config_mac)
+        """
+	split pour copier le 1er ligne des @ mac en deux partie macsrc mac dst 00:00:00:00:00:01(partie1)/00:00:00:00:00:02(par2)
+	"""
+	for line in fin:
+		macrule = line.split()
+		print "MAC rule:",macrule
+		if (len(macrule) > 0):
+			configmac.append(macrule)	
+	
+def launch(configuration="", config_mac=""):
 
 	print "Starting Pox Firewall.."
 	def start_firewall(event):
@@ -316,6 +345,10 @@ def launch(configuration=""):
 		Firewall(event.connection)
 
 	parse_config(configuration)
+	parse_configmac(config_mac)
+	"""
+	core pour connecter au pare-feu via la fonction en haut (firewall (eveent.connection)) et appliquer la class en haut class firewall (object)
+	"""
 	core.openflow.addListenerByName("ConnectionUp",start_firewall)
 """
 Global variables
@@ -325,3 +358,8 @@ srcip   = 0
 srcport = 1
 dstip   = 2
 dstport = 3
+configmac  = []
+macsrc   = 0
+macdst = 1
+
+
