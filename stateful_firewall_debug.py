@@ -27,11 +27,11 @@ class Firewall(object):
 		add.Listeners= comme Ecouteur pour Appeler la fonction _handle_PacketIn.
 		"""
 		connection.addListeners(self)		
-
+		 
 	def config_ARP_flow(self):
-		self.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
-		self.config_protocol_flow(pkt.arp.REPLY,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
-		
+		self.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,True)
+		self.config_protocol_flow(pkt.arp.REPLY,pkt.ethernet.ARP_TYPE,None,None,None,None,True)
+                  		
 	def config_ICMP_flow(self):
 		self.config_protocol_flow(pkt.ipv4.ICMP_PROTOCOL,pkt.ethernet.IP_TYPE,None,None,None,None,False)
 
@@ -113,6 +113,13 @@ class Firewall(object):
 		print "Packet Type:", packet.type	
 		#print packet_in
 
+    		if packet.type == packet.ARP_TYPE:
+			print "It's ARP" 
+       			if packet.payload.opcode == pkt.arp.REQUEST:
+				print "ARP Request"				           		
+                        elif packet.payload.opcode == pkt.arp.REPLY:
+                        	print "ARP Reply"                                                   			
+		
 		if packet.type == packet.IP_TYPE:
 			ip_packet = packet.payload
 			print "IP packet:", ip_packet.protocol
@@ -361,5 +368,3 @@ dstport = 3
 configmac  = []
 macsrc   = 0
 macdst = 1
-
-
