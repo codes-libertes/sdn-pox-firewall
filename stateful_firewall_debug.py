@@ -114,11 +114,10 @@ class Firewall(object):
 		#print packet_in
 
     		if packet.type == packet.ARP_TYPE:
-			print "It's ARP" 
-       			if packet.payload.opcode == pkt.arp.REQUEST:
-				print "ARP Request"				           		
-                        elif packet.payload.opcode == pkt.arp.REPLY:
-                        	print "ARP Reply"                                                   			
+			print "ARP Packet"
+			tracker = ARPConnTrack(self,packet)
+			if tracker:
+				tracker.track_network()
 		
 		if packet.type == packet.IP_TYPE:
 			ip_packet = packet.payload
@@ -287,6 +286,17 @@ class TCPConnTrack(object):
 
 
 class UDPConnTrack(object):
+
+	def __init__(self,cap_obj,pkt):
+		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+		self.cap = cap_obj
+		self.pkt = pkt
+	
+	def track_network(self): 
+		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+
+
+class ARPConnTrack(object):
 
 	def __init__(self,cap_obj,pkt):
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
