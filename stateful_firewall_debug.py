@@ -58,17 +58,14 @@ class Firewall(object):
 		If all 2 parameters in l2_fw_rules, drop the packet; 
 		"""	
 		global l2_fw_rules	
-		key = (str(dl_src),str(dl_dst))
+		key = (str(dl_src), str(dl_dst))
 		print "key:",key
 		if key in l2_fw_rules:
-			print "Policy from (%s) to (%s:%d) found" % (str(dl_src),str(dl_dst))
+			print "Policy from (%s) to (%s) found" % (str(dl_src), str(dl_dst))
 			return True
 		else:
-			print "No policy from (%s) to (%s:%d) found" % (str(dl_src),str(dl_dst))
+			print "No policy from (%s) to (%s) found" % (str(dl_src), str(dl_dst))
 			return False
-
-	def check_policy_ICMP(self):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 
 	def config_protocol_flow(self, nw_proto, dl_type, nw_src, nw_dst, tp_src, tp_dst, to_controller):
 		"""
@@ -76,10 +73,12 @@ class Firewall(object):
         	"""
 		msg = of.ofp_flow_mod()
 		match = of.ofp_match()
+
 		match.nw_src = nw_src
 		match.nw_dst = nw_dst
 		match.tp_src = tp_src
 		match.tp_dst = tp_dst
+
 		match.nw_proto = nw_proto
 		# 0x0800 for IPv4, 0x0806 for ARP
 		match.dl_type = dl_type	
@@ -113,7 +112,13 @@ class Firewall(object):
 		self.connection.send(msg)
 
 
-	def act_like_firewall(self, packet, packet_in):
+	def _handle_PacketIn(self, event):
+		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+		packet = event.parsed
+		if not packet.parsed:
+			log.warning("Ignoring incomplete packets")
+			return
+
 		"""
 		pox/lib/packet/ethernet.py
 		35020 :0x88cc:LLDP
@@ -127,10 +132,11 @@ class Firewall(object):
 			return
 		
 		print "Packet Type:", packet.type	
-		#print packet_in
+		#print event.ofp.packet_in
 
     		if packet.type == packet.ARP_TYPE:
 			print "ARP Packet"
+			print "event.port:",event.port
 			tracker = ARPConnTrack(self,packet)
 			if tracker:
 				tracker.track_network()
@@ -157,19 +163,6 @@ class Firewall(object):
 					tracker.track_network()
 			elif ip_packet.protocol == ip_packet.ICMP_PROTOCOL:
 				print "ICMP Packet"
-
-	"""
-	la fonction _handle_PacketIn va traiter les donnees de OpenFlow [ARP, ICMP, TCP,UDP, ...]
-	"""
-	def _handle_PacketIn(self, event):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
-		packet = event.parsed
-		if not packet.parsed:
-			log.warning("Ignoring incomplete packets")
-			return
-
-		packet_in = event.ofp
-		self.act_like_firewall(packet,packet_in)			
 		
 	def check_IPinside(self, ip):
         	"""
@@ -328,15 +321,38 @@ class ARPConnTrack(object):
 		self.fw = fw_obj
 		self.pkt = pkt
 	
+	def config_flow(self, nw_proto, dl_type, dl_src, dl_dst):
+		"""
+        	Configurations for ARPpacket flows
+        	"""
+		msg = of.ofp_flow_mod()
+		match = of.ofp_match()
+		match.dl_src = dl_src
+		match.dl_dst = dl_dst
+		match.nw_proto = nw_proto
+		match.dl_type = dl_type	
+		msg.match = match
+		msg.priority = 32768
+		
+		if str(dl_dst) == "ff:ff:ff:ff:ff:ff":
+			action = of.ofp_action_output(port=of.OFPP_FLOOD)
+		else:
+			action = of.ofp_action_output(port=of.OFPP_NORMAL)
+		msg.actions.append(action)
+		self.fw.connection.send(msg)
+	
 	def track_network(self): 
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
-		"""
-		if True == check_policy_ARP(self,dl_src,dl_dst):
+
+		print "dl_src:",self.pkt.src
+		print "dl_dst:",self.pkt.dst
+
+		if True == self.fw.check_policy_ARP(self.pkt.src, self.pkt.dst):
 			print "This packet matched the rule and dropped !!"
 			return False
-		"""
 		self.fw.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
 		self.fw.config_protocol_flow(pkt.arp.REPLY,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
+
 
 
 def clean_ip(cidrAddress):
