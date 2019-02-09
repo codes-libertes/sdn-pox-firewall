@@ -14,7 +14,6 @@ log = core.getLogger()
 class Firewall(object):
 
 	def __init__(self, connection):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
   		"""
 		self.connection = variable locale que on a enregistre connection (var externe)sur la var self.connection 
 		"""
@@ -37,7 +36,6 @@ class Firewall(object):
 		self.config_protocol_flow(pkt.ipv4.TCP_PROTOCOL,pkt.ethernet.IP_TYPE,None,None,None,None,True)
 
 	def check_policy_TCP(self, nw_src, nw_dst, tp_dst=0):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		"""
 		If all 3 parameters in l4_fw_rules, drop the packet; 
 		"""	
@@ -54,8 +52,20 @@ class Firewall(object):
 	def check_policy_UDP(self):
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 	
-	def check_policy_ARP(self):
+	def check_policy_ARP(self,dl_src,dl_dst):
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+		"""
+		If all 2 parameters in l2_fw_rules, drop the packet; 
+		"""	
+		global l2_fw_rules	
+		key = (str(dl_src),str(dl_dst))
+		print "key:",key
+		if key in l2_fw_rules:
+			print "Policy from (%s) to (%s:%d) found" % (str(dl_src),str(dl_dst))
+			return True
+		else:
+			print "No policy from (%s) to (%s:%d) found" % (str(dl_src),str(dl_dst))
+			return False
 
 	def check_policy_ICMP(self):
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
@@ -104,7 +114,6 @@ class Firewall(object):
 
 
 	def act_like_firewall(self, packet, packet_in):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		"""
 		pox/lib/packet/ethernet.py
 		35020 :0x88cc:LLDP
@@ -166,7 +175,6 @@ class Firewall(object):
         	"""
         	Check if the IP is from inside the network or not.
         	"""
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		for network in self.inside_network:
 			if IPAddress(str(ip)) in IPNetwork(network):
 				return True
@@ -176,7 +184,6 @@ class Firewall(object):
 class TCPConnTrack(object):
 
 	def __init__(self,fw_obj,pkt):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		self.fw= fw_obj
 		self.pkt = pkt
 		self.set_flags()
@@ -308,7 +315,6 @@ class TCPConnTrack(object):
 class UDPConnTrack(object):
 
 	def __init__(self,fw_obj,pkt):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		self.fw = fw_obj
 		self.pkt = pkt
 	
@@ -319,12 +325,16 @@ class UDPConnTrack(object):
 class ARPConnTrack(object):
 
 	def __init__(self,fw_obj,pkt):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		self.fw = fw_obj
 		self.pkt = pkt
 	
 	def track_network(self): 
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+		"""
+		if True == check_policy_ARP(self,dl_src,dl_dst):
+			print "This packet matched the rule and dropped !!"
+			return False
+		"""
 		self.fw.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
 		self.fw.config_protocol_flow(pkt.arp.REPLY,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
 
@@ -349,19 +359,16 @@ def str_bool(policy):
 	policy: many options 
 	"""
 	if str(policy).lower() in ("yes","y","true","t","allow","permit","1"):
-		print "str_bool False"
 		return False
 	if str(policy).lower() in ("no","n","false","f","block","deny","0"):
-		print "str_bool True"
 		return True
 
 def parse_config_l4(config_l4):
-	print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 	global l4_fw_rules	
 	fin = open(config_l4)
 	for line in fin:
 		rule = re.sub(r'\s', '',line).split(',')
-		print "rule:",rule
+		print "ip rule:",rule
 		if (len(rule) > 0):
 			nw_src = clean_ip(rule[srcip])	
 			nw_dst = clean_ip(rule[dstip])	
@@ -371,45 +378,41 @@ def parse_config_l4(config_l4):
 				l4_fw_rules[key] = True	
 
 
-def parse_configmac(config_mac):
-	print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
-	"""
- 	<srcip> [ / <netmask> ] <srcport> <dstip> [ / <netmask> ] <dstport>
-	"""
-	"""
-	lire le fichier firewall-config-mac
-	"""
-	
-	global configmac	
-	fin = open(config_mac)
-        """
-	split pour copier le 1er ligne des @ mac en deux partie macsrc mac dst 00:00:00:00:00:01(partie1)/00:00:00:00:00:02(par2)
-	"""
+def parse_config_l2(config_l2):
+	global l2_fw_rules	
+	fin = open(config_l2)
 	for line in fin:
-		macrule = line.split()
-		print "MAC rule:",macrule
-		if (len(macrule) > 0):
-			configmac.append(macrule)	
+		rule = re.sub(r'\s', '',line).split(',')
+		print "mac rule:",rule
+		if (len(rule) > 0):
+			dl_src = rule[macsrc]
+			dl_dst = rule[macdst]	
+			key = (dl_src,dl_dst)
+			if True == str_bool(rule[macpolicy]):
+				l2_fw_rules[key] = True	
 	
-def launch(config_l4="", config_mac=""):
-
+def launch(config_l4="", config_l2=""):
 	print "Starting Pox Firewall.."
 	def start_firewall(event):
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 		Firewall(event.connection)
 
 	parse_config_l4(config_l4)
-	parse_configmac(config_mac)
-	"""
-	core pour connecter au pare-feu via la fonction en haut (firewall (eveent.connection)) et appliquer la class en haut class firewall (object)
-	"""
+	parse_config_l2(config_l2)
 	core.openflow.addListenerByName("ConnectionUp",start_firewall)
+
+
 """
 Global variables
-@l4_fw_rules: <srcip>,<dstip>,<dstport>,<port>
+@l4_fw_rules: <srcip>,<dstip>,<dstport>,<policy>
 	   <srcip>:
 	   <dstip>:
 	   <dstport>:
+	   <policy>:
+		-"yes","y","true","t","allow","permit","1"
+		-"no","n","false","f","block","deny","0"
+@l2_fw_rules: <macsrc>,<macdst>,<policy>
+	   <macsrc>:
+	   <macdst>:
 	   <policy>:
 		-"yes","y","true","t","allow","permit","1"
 		-"no","n","false","f","block","deny","0"
@@ -419,6 +422,7 @@ srcip   = 0
 dstip   = 1
 dstport = 2
 policy  = 3
-configmac  = []
-macsrc   = 0
-macdst = 1
+l2_fw_rules  = {}
+macsrc    = 0
+macdst    = 1
+macpolicy = 2
