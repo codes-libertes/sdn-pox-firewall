@@ -89,11 +89,10 @@ class Firewall(object):
 		tcp_packet = ip_packet.payload
 
 		fields = [str(ip_packet.srcip),str(tcp_packet.srcport),str(ip_packet.dstip),str(tcp_packet.dstport)]
-                print fields
-	
-		self.config_protocol_flow(pkt.ipv4.TCP_PROTOCOL,pkt.ethernet.IP_TYPE,ip_packet.srcip,ip_packet.dstip,tcp_packet.srcport,tcp_packet.dstport,False)
-		self.config_protocol_flow(pkt.ipv4.TCP_PROTOCOL,pkt.ethernet.IP_TYPE,ip_packet.dstip,ip_packet.srcip,tcp_packet.dstport,tcp_packet.srcport,False)
-		
+                print fields	
+					   
+                self.config_protocol_flow(pkt.ipv4.TCP_PROTOCOL,pkt.ethernet.IP_TYPE,ip_packet.srcip,ip_packet.dstip,tcp_packet.srcport,tcp_packet.dstport,False)
+                self.config_protocol_flow(pkt.ipv4.TCP_PROTOCOL,pkt.ethernet.IP_TYPE,ip_packet.dstip,ip_packet.srcip,tcp_packet.dstport,tcp_packet.srcport,False)
 		msg = of.ofp_packet_out()
 		msg.data = packet
 		action = of.ofp_action_output(port=of.OFPP_NORMAL)
@@ -131,7 +130,7 @@ class Firewall(object):
 					tracker.track_network()
 
 			elif ip_packet.protocol == ip_packet.UDP_PROTOCOL:
-				print "UDP Packet"
+				print "UDP Pconfig_protocol_flow(acket"
 				tracker = UDPConnTrack(self,packet)
 				if tracker:
 					tracker.track_network()
@@ -227,7 +226,7 @@ class TCPConnTrack(object):
 				self.cap.flow_table[key][1] += "in"
 				print "TCP Packet ACK from inside"
 				return True
-			elif self.cap.flow_table[key][2] < 100: #It's a check to prevent from DOS
+			elif self.cap.flow_table[key][2] < 100:
 				self.cap.flow_table[key][2] += 1
 				return True
 			elif self.cap.flow_table[key][2] >= 100:
@@ -305,6 +304,9 @@ class ARPConnTrack(object):
 	
 	def track_network(self): 
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+		self.cap.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
+		self.cap.config_protocol_flow(pkt.arp.REPLY,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
+
 
 def clean_ip(cidrAddress):
 	strAddress = cidrAddress.split('/',2)
