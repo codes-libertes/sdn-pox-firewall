@@ -130,7 +130,7 @@ class Firewall(object):
 					tracker.track_network()
 
 			elif ip_packet.protocol == ip_packet.UDP_PROTOCOL:
-				print "UDP Pconfig_protocol_flow(acket"
+				print "UDP Packet"
 				tracker = UDPConnTrack(self,packet)
 				if tracker:
 					tracker.track_network()
