@@ -430,8 +430,10 @@ def launch(config_l4="", config_l2=""):
 	def start_firewall(event):
 		Firewall(event.connection)
 
-	parse_config_l4(config_l4)
-	parse_config_l2(config_l2)
+	if config_l4 != "":
+		parse_config_l4(config_l4)
+	if config_l2 != "":
+		parse_config_l2(config_l2)
 	core.openflow.addListenerByName("ConnectionUp",start_firewall)
 
 
