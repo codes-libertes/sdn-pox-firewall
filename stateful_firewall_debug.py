@@ -125,15 +125,13 @@ class Firewall(object):
 		2048  :0x0800:IP
 		34525 :0x86DD:IPv4
 		"""
+		print "Packet Type:", packet.type	
 		if packet.type == packet.LLDP_TYPE:
 			return
 		
 		if packet.type == packet.IPV6_TYPE:
 			return
 		
-		print "Packet Type:", packet.type	
-		#print event.ofp.packet_in
-
     		if packet.type == packet.ARP_TYPE:
 			print "ARP Packet"
 			print "event.port:",event.port
@@ -163,6 +161,9 @@ class Firewall(object):
 					tracker.track_network()
 			elif ip_packet.protocol == ip_packet.ICMP_PROTOCOL:
 				print "ICMP Packet"
+				tracker = ICMPConnTrack(self,packet)
+				if tracker:
+					tracker.track_network()
 		
 	def check_IPinside(self, ip):
         	"""
@@ -314,6 +315,23 @@ class UDPConnTrack(object):
 	def track_network(self): 
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 
+
+class ICMPConnTrack(object):
+
+	def __init__(self,fw_obj,pkt):
+		self.fw = fw_obj
+		self.pkt = pkt
+	
+	def track_network(self):
+		""" 
+		print "dl_src:",self.pkt.src
+		print "dl_dst:",self.pkt.dst
+
+		if True == self.fw.check_policy_ARP(self.pkt.src, self.pkt.dst):
+			print "This packet matched the rule and dropped !!"
+			return False
+		"""
+		self.fw.config_protocol_flow(pkt.ipv4.ICMP_PROTOCOL,pkt.ethernet.IP_TYPE,None,None,None,None,False)
 
 class ARPConnTrack(object):
 
