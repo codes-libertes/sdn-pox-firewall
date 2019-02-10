@@ -18,7 +18,7 @@ class Firewall(object):
 		self.connection = variable locale que on a enregistre connection (var externe)sur la var self.connection 
 		"""
 		self.connection = connection 
-		self.ip_port_seq_table = {}
+		self.ip_seq_table = {}
 		self.inside_network = ["10.0.0.0/24"]
 		self.config_openflow()
 		"""
@@ -230,22 +230,22 @@ class TCPConnTrack(object):
 			print "This packet matched the rule and dropped !!"
 			return False
 
-		key = (str(ip_packet.srcip),str(ip_packet.dstip),int(tcp_packet.seq),int(tcp_packet.dstport))
+		key = (str(ip_packet.srcip),str(ip_packet.dstip),int(tcp_packet.seq))
 		print "key:",key
 
-		if key in self.fw.ip_port_seq_table:
+		if key in self.fw.ip_seq_table:
 			print "key in the table"
 			"""
 			TCP SYN flood 
 			"""	
-			if self.fw.ip_port_seq_table[key][0] < 100 and self.SYN:
-				self.fw.ip_port_seq_table[key][0] +=1
-				print "TCP SYN flood counter:",self.fw.ip_port_seq_table[key][0]
+			if self.fw.ip_seq_table[key][0] < 100 and self.SYN:
+				self.fw.ip_seq_table[key][0] +=1
+				print "TCP SYN flood counter:",self.fw.ip_seq_table[key][0]
 				return True
 
-			if self.fw.ip_port_seq_table[key][0] >= 100 and self.SYN:
-				print "TCP SYN flood counter:",self.fw.ip_port_seq_table[key][0]
-				del self.fw.ip_port_seq_table[key]
+			if self.fw.ip_seq_table[key][0] >= 100 and self.SYN:
+				print "TCP SYN flood counter:",self.fw.ip_seq_table[key][0]
+				del self.fw.ip_seq_table[key]
 				print "TCP SYN flood attack detected!!!"
 				return True
 		else:
@@ -254,7 +254,7 @@ class TCPConnTrack(object):
 			"""
 			print "key not in the table"
 			if self.SYN:
-				self.fw.ip_port_seq_table[key] = [1]
+				self.fw.ip_seq_table[key] = [1]
 				return True
 
 	
