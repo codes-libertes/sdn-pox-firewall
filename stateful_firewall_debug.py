@@ -19,16 +19,25 @@ class Firewall(object):
 		"""
 		self.connection = connection 
 		self.ip_seq_table = {}
+		self.ip_port_table = {}
+		self.actve_connection_table = {}
 		self.inside_network = ["10.0.0.0/24"]
-		self.config_openflow()
+		self.verify_legitimite()
 		"""
 		add.Listeners= comme Ecouteur pour Appeler la fonction _handle_PacketIn.
 		"""
 		connection.addListeners(self)		
-		 
-	def config_openflow(self):
+	
+	def verify_legitimite(self):
 		"""
-		All incoming packet flows to Controller
+		Allow all legal incoming packet flows to Controller
+		"""
+		"""
+		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+		global l4_fw_rules	
+		for key in l4_fw_rules:
+			print "srcip:",l4_fw_rules[key][srcip]
+			print "dstip:",l4_fw_rules[key][dstip]
 		"""
 		self.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,True)
 		self.config_protocol_flow(pkt.arp.REPLY,pkt.ethernet.ARP_TYPE,None,None,None,None,True)
@@ -213,7 +222,6 @@ class TCPConnTrack(object):
 		if tcp_packet is None:
 			return
 	
-		print "tcp_packet.flags:",tcp_packet.flags
 		decode = '{0:09b}'.format(tcp_packet.flags)
 		print "decode:",decode
 		print "seq:",tcp_packet.seq
@@ -227,65 +235,79 @@ class TCPConnTrack(object):
 		self.ECE = decode[-7]
 		self.CWR = decode[-8]
 		self.NS  = decode[-9]
-	
-		#flags = [str(self.NS),str(self.CWR),str(self.ECE),str(self.URG),str(self.ACK),str(self.PSH),str(self.RST),str(self.SYN),str(self.FIN)]
-		#print flags
 
 	def track_network(self): 
         	"""
         	Tracks inside and outside network traffic
         	"""
 		if self.fw.check_IPinside(self.pkt.payload.srcip):
-			allow_resend = self.track_inside_network()
+			self.track_inside_network()
 		else:
-			allow_resend = self.track_outside_network()
+			self.track_outside_network()
 
-		if True == allow_resend:
-			self.fw.resend_packet(self.pkt)
+		self.fw.resend_packet(self.pkt)
 
 	def track_inside_network(self): 
 		ip_packet = self.pkt.payload	
 		tcp_packet = ip_packet.payload
 	
-		if True == self.fw.check_policy_l3(ip_packet.srcip,ip_packet.dstip):
-			print "This packet matched the rule and dropped !!"
-			return False
+		key = (str(ip_packet.srcip),str(tcp_packet.srcport),str(ip_packet.dstip),str(tcp_packet.dstport))
 
-		if True == self.fw.check_policy_l4(ip_packet.srcip,ip_packet.dstip,tcp_packet.dstport):
-			print "This packet matched the rule and dropped !!"
-			return False
-
-		key = (str(ip_packet.srcip),str(ip_packet.dstip),int(tcp_packet.seq))
-		print "key:",key
-
-		if key in self.fw.ip_seq_table:
-			print "key in the table"
-			"""
-			TCP SYN flood 
-			"""	
-			if self.fw.ip_seq_table[key][0] < 100 and self.SYN:
-				self.fw.ip_seq_table[key][0] +=1
-				print "TCP SYN flood counter:",self.fw.ip_seq_table[key][0]
-				return True
-
-			if self.fw.ip_seq_table[key][0] >= 100 and self.SYN:
-				print "TCP SYN flood counter:",self.fw.ip_seq_table[key][0]
-				del self.fw.ip_seq_table[key]
-				print "TCP SYN flood attack detected!!!"
-				self.fw.update_policy_l3(ip_packet.srcip,ip_packet.dstip)
-				return True
+		if key in self.fw.ip_port_table:
+			if self.fw.ip_port_table[key][:2] == [1,"out"] and self.SYN and self.ACK:
+				self.fw.ip_port_table[key][0] +=1
+				self.fw.ip_port_table[key][1] = "in"
+				print "TCP SYN-ACK from inside"
+				return True		
+			elif self.fw.ip_port_table[key][:2] == [2,"out"] and self.ACK:
+				del self.fw.ip_port_table[key]
+				self.fw.ip_seq_table[key] = [int(tcp_packet.seq)]
+				self.fw.actve_connection_table[key] = ["active"]
+				print "TCP ACK from inside"
+				return True		
 		else:
 			"""
-			SEQ Counter
+			Establishment of TCP connection	
 			"""
-			print "key not in the table"
 			if self.SYN:
-				self.fw.ip_seq_table[key] = [1]
+				"""
+				[Order of packets, traffic direction]
+				"""
+				self.fw.ip_port_table[key] = [1,"in"]
+				print "TCP SYN from inside"
 				return True
 
 	
 	def track_outside_network(self): 
-		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
+		ip_packet = self.pkt.payload	
+		tcp_packet = ip_packet.payload
+	
+		key = (str(ip_packet.dstip),str(tcp_packet.dstport),str(ip_packet.srcip),str(tcp_packet.srcport))
+
+		if key in self.fw.ip_port_table:
+			if self.fw.ip_port_table[key][:2] == [1,"in"] and self.SYN and self.ACK:
+				self.fw.ip_port_table[key][0] +=1
+				self.fw.ip_port_table[key][1] = "out"
+				print "TCP SYN-ACK from outside"
+				return True		
+			elif self.fw.ip_port_table[key][:2] == [2,"in"] and self.ACK:
+				del self.fw.ip_port_table[key]
+				keyinverse = (str(ip_packet.srcip),str(tcp_packet.srcport),str(ip_packet.dstip),str(tcp_packet.dstport))
+				self.fw.ip_seq_table[keyinverse] = [int(tcp_packet.seq)]
+				self.fw.actve_connection_table[keyinverse] = ["active"]
+				print "TCP ACK from outside"
+				return True		
+		else:
+			"""
+			Establishment of TCP connection	
+			"""
+			if self.SYN:
+				"""
+				[Order of packets, traffic direction]
+				"""
+				self.fw.ip_port_table[key] = [1,"out"]
+				print "TCP SYN from outside"
+				return True
 
 
 class UDPConnTrack(object):
@@ -305,14 +327,6 @@ class ICMPConnTrack(object):
 		self.pkt = pkt
 	
 	def track_network(self):
-		""" 
-		print "dl_src:",self.pkt.src
-		print "dl_dst:",self.pkt.dst
-
-		if True == self.fw.check_policy_l2(self.pkt.src, self.pkt.dst):
-			print "This packet matched the rule and dropped !!"
-			return False
-		"""
 		self.fw.config_protocol_flow(pkt.ipv4.ICMP_PROTOCOL,pkt.ethernet.IP_TYPE,None,None,None,None,False)
 
 class ARPConnTrack(object):
@@ -344,15 +358,8 @@ class ARPConnTrack(object):
 	def track_network(self): 
 		print ("[%s][%d][%s]" % (sys._getframe().f_code.co_filename,sys._getframe().f_lineno,sys._getframe().f_code.co_name))
 
-		print "dl_src:",self.pkt.src
-		print "dl_dst:",self.pkt.dst
-
-		if True == self.fw.check_policy_l2(self.pkt.src, self.pkt.dst):
-			print "This packet matched the rule and dropped !!"
-			return False
 		self.fw.config_protocol_flow(pkt.arp.REQUEST,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
 		self.fw.config_protocol_flow(pkt.arp.REPLY,pkt.ethernet.ARP_TYPE,None,None,None,None,False)
-
 
 
 def clean_ip(cidrAddress):
