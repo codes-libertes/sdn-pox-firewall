@@ -263,6 +263,7 @@ class TCPConnTrack(object):
 				del self.fw.ip_port_table[key]
 				self.fw.ip_seq_table[key] = [int(tcp_packet.seq)]
 				self.fw.actve_connection_table[key] = ["active"]
+				print "self.fw.actve_connection_table:",self.fw.actve_connection_table
 				print "TCP ACK from inside"
 				return True		
 		else:
@@ -295,6 +296,7 @@ class TCPConnTrack(object):
 				keyinverse = (str(ip_packet.srcip),str(tcp_packet.srcport),str(ip_packet.dstip),str(tcp_packet.dstport))
 				self.fw.ip_seq_table[keyinverse] = [int(tcp_packet.seq)]
 				self.fw.actve_connection_table[keyinverse] = ["active"]
+				print "self.fw.actve_connection_table:",self.fw.actve_connection_table
 				print "TCP ACK from outside"
 				return True		
 		else:
